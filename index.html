@@ -67,6 +67,8 @@ canvas{width:100%;height:auto;border-radius:14px;box-shadow:0 18px 60px rgba(18,
     <div class="sec">Style</div>
     <label for="theme">Theme</label>
     <select id="theme"><option value="light">Light (safed)</option><option value="dark">Dark (navy)</option></select>
+    <label for="q">Download quality</label>
+    <select id="q"><option value="2">High: 2160 px (best for Facebook / LinkedIn)</option><option value="3">Ultra: 3240 px (print / zoom)</option><option value="1">Normal: 1080 px</option></select>
     <label for="size">Size</label>
     <select id="size"><option value="s">Square 1080×1080</option><option value="p">Portrait 1080×1350</option></select>
     <label for="foot">Footer text</label>
@@ -91,7 +93,7 @@ const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
 const F = 'PJS, "Segoe UI", Arial, sans-serif';
 const NAVYC = '#12303D', DEEP = '#0A202B', GREEN = '#86C80A', LIME = '#9BDB1F';
-let light = true, photo = null, logo = null, logoLight = null, W = 1080, H = 1080, queued = false;
+let SC = 1, light = true, photo = null, logo = null, logoLight = null, W = 1080, H = 1080, queued = false;
 
 const loadImg = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
 const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); };
@@ -114,13 +116,13 @@ function recolor(img) {
 
 /* liquid glass: blurred copy of what is behind + tint + sheen + bright edge */
 function glass(x, y, w, h, r, tint, sheen) {
-  if (light) { ctx.save(); ctx.shadowColor = 'rgba(18,48,61,.30)'; ctx.shadowBlur = 36; ctx.shadowOffsetY = 12; ctx.fillStyle = '#12303D'; rr(x, y, w, h, r); ctx.fill(); ctx.restore(); }
-  const snap = document.createElement('canvas'); snap.width = W; snap.height = H;
+  if (light) { ctx.save(); const off = 4000; ctx.shadowColor = 'rgba(18,48,61,.30)'; ctx.shadowBlur = 36 * SC; ctx.shadowOffsetX = off * SC; ctx.shadowOffsetY = 12 * SC; ctx.fillStyle = '#12303D'; rr(x - off, y, w, h, r); ctx.fill(); ctx.restore(); }
+  const snap = document.createElement('canvas'); snap.width = W * SC; snap.height = H * SC;
   snap.getContext('2d').drawImage(cv, 0, 0);
   ctx.save();
   rr(x, y, w, h, r); ctx.clip();
-  ctx.filter = 'blur(26px) saturate(1.7) brightness(1.08)';
-  ctx.drawImage(snap, 0, 0);
+  ctx.filter = `blur(${26 * SC}px) saturate(1.7) brightness(1.08)`;
+  ctx.drawImage(snap, 0, 0, W, H);
   ctx.filter = 'none';
   ctx.fillStyle = tint; ctx.fillRect(x, y, w, h);
   const g = ctx.createLinearGradient(x, y, x + w * .6, y + h);
@@ -174,10 +176,11 @@ function icons(xRight, cy) {
   for (let i = d.length - 1; i >= 0; i--) { ctx.save(); d[i](); ctx.restore(); x -= s + gap; }
 }
 
-function draw() {
-  light = $('theme').value === 'light';
+function draw(S = 1) {
+  SC = S; light = $('theme').value === 'light';
   W = 1080; H = $('size').value === 'p' ? 1350 : 1080;
-  cv.width = W; cv.height = H;
+  cv.width = W * S; cv.height = H * S;
+  ctx.setTransform(S, 0, 0, S, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   const M = 56, phH = Math.round(H * .76), BG = light ? '255,255,255' : '10,32,43';
   ctx.fillStyle = light ? '#FFFFFF' : DEEP; ctx.fillRect(0, 0, W, H);
 
@@ -292,8 +295,9 @@ $('logoIn').addEventListener('change', e => {
 });
 
 $('dl').onclick = () => {
-  draw();
+  const q = +$('q').value || 2;
   try {
+    draw(q);
     cv.toBlob(b => {
       const a = document.createElement('a');
       const slug = ($('name').value || 'post').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -303,6 +307,7 @@ $('dl').onclick = () => {
   } catch (e) {
     $('msg').textContent = 'Browser security ki wajah se logo.png se export nahi ho saka. Upar "Logo select karein" se logo.png ek baar chunein, phir dobara download karein.';
   }
+  draw(1);
 };
 
 Promise.all([400, 500, 600, 700, 800].map(w => document.fonts.load(`${w} 24px PJS`))).catch(() => {}).then(() => { draw(); initLogo(); });
